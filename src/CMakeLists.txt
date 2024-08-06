@@ -1,8 +1,12 @@
 project(src)
 
+#TODO: Update to the latest version C++
+SET(CMAKE_CXX_STANDARD 11)
+
 set(CMAKE_BUILD_TYPE RelWithDebugInfo)
 #set(CMAKE_BUILD_TYPE Debug)
 
+#TODO: Update to the latest version of CMake
 cmake_minimum_required (VERSION 2.6)
 
 # Set the OpenALPR version in cmake, and also add it as a DEFINE for the code to access
@@ -122,11 +126,9 @@ IF (WIN32)
 		ws2_32.lib
 	)
 ELSE()
-
-	SET (Extra_LIBS
-		pthread
-	)
-
+  IF (NOT ANDROID)
+    SET (Extra_LIBS pthread)
+  ENDIF()  
 ENDIF()
 
 
@@ -161,6 +163,19 @@ if (NOT IOS)
   )
 ENDIF()
 
+IF (ANDROID)
+  SET(WITH_DAEMON false)
+  # This is tricky because it is only needed for arm64-v8a, mips64, x86_64
+  # It cannot find these libs in these cases, so it seems dirty
+  # TODO: Get some knowledge with -rpath option and CMake impl for RPATH and clean that !
+  SET(Explicit_LIBS
+    ${Pngt_LIB}
+    ${Jpgt_LIB}
+    ${Jnigraphics_LIB}
+    )
+  target_link_libraries(alpr ${Explicit_LIBS})
+ENDIF()
+
 
 # Compile the alprd library on Unix-based OS
 IF (WITH_DAEMON)
@@ -176,12 +191,12 @@ IF (WITH_DAEMON)
 
   TARGET_LINK_LIBRARIES(alprd
       ${OPENALPR_LIB}
-	  support
+	    support
       video
-	  curl
-	  ${OpenCV_LIBS}
-	  ${Tesseract_LIBRARIES}
-	  ${log4cplus_LIBRARIES}
+	    libcurl.a
+      ${OpenCV_LIBS}
+      ${Tesseract_LIBRARIES}
+      ${log4cplus_LIBRARIES}
       ${Extra_LIBS}
     )
 	
@@ -275,4 +290,3 @@ CONFIGURE_FILE(
   @ONLY)
 
 ADD_CUSTOM_TARGET(uninstall COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
-

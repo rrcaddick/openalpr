@@ -11,9 +11,8 @@ ADD_EXECUTABLE( unittests
 )
 
 TARGET_LINK_LIBRARIES(unittests
-
 	openalpr
-
+  ${Explicit_LIBS}
   )
 
 add_test(unittests unittests)

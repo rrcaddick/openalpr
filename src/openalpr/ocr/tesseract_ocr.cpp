@@ -26,36 +26,36 @@ using namespace std;
 using namespace cv;
 using namespace tesseract;
 
-namespace alpr
-{
+namespace alpr {
 
   TesseractOcr::TesseractOcr(Config* config)
-  : OCR(config)
+  : OCR(config), tesseract(new TessBaseAPI())  // Initialize tesseract using smart pointers
   {
-    const string MINIMUM_TESSERACT_VERSION = "3.03";
+    const string MINIMUM_TESSERACT_VERSION = "5.0.0";
 
     this->postProcessor.setConfidenceThreshold(config->postProcessMinConfidence, config->postProcessConfidenceSkipLevel);
     
-    if (cmpVersion(tesseract.Version(), MINIMUM_TESSERACT_VERSION.c_str()) < 0)
+    if (cmpVersion(tesseract->Version(), MINIMUM_TESSERACT_VERSION.c_str()) < 0)
     {
       std::cerr << "Warning: You are running an unsupported version of Tesseract." << endl;
-      std::cerr << "Expecting at least " << MINIMUM_TESSERACT_VERSION << ", your version is: " << tesseract.Version() << endl;
+      std::cerr << "Expecting at least " << MINIMUM_TESSERACT_VERSION << ", your version is: " << tesseract->Version() << endl;
     }
 
     string TessdataPrefix = config->getTessdataPrefix();
-    if (cmpVersion(tesseract.Version(), "4.0.0") >= 0)
+    if (cmpVersion(tesseract->Version(), "4.0.0") >= 0)
       TessdataPrefix += "tessdata/";    
 
     // Tesseract requires the prefix directory to be set as an env variable
-    tesseract.Init(TessdataPrefix.c_str(), config->ocrLanguage.c_str() 	);
-    tesseract.SetVariable("save_blob_choices", "T");
-    tesseract.SetVariable("debug_file", "/dev/null");
-    tesseract.SetPageSegMode(PSM_SINGLE_CHAR);
+    tesseract->Init(TessdataPrefix.c_str(), config->ocrLanguage.c_str() );
+    tesseract->SetVariable("save_blob_choices", "T");
+    tesseract->SetVariable("debug_file", "/dev/null");
+    tesseract->SetPageSegMode(tesseract::PSM_SINGLE_CHAR);
   }
 
   TesseractOcr::~TesseractOcr()
   {
-    tesseract.End();
+    tesseract->End();
+    delete tesseract;
   }
   
   std::vector<OcrChar> TesseractOcr::recognize_line(int line_idx, PipelineData* pipeline_data) {
@@ -68,21 +68,20 @@ namespace alpr
     {
       // Make it black text on white background
       bitwise_not(pipeline_data->thresholds[i], pipeline_data->thresholds[i]);
-      tesseract.SetImage((uchar*) pipeline_data->thresholds[i].data, 
+      tesseract->SetImage((uchar*) pipeline_data->thresholds[i].data, 
                           pipeline_data->thresholds[i].size().width, pipeline_data->thresholds[i].size().height, 
                           pipeline_data->thresholds[i].channels(), pipeline_data->thresholds[i].step1());
 
- 
       int absolute_charpos = 0;
 
       for (unsigned int j = 0; j < pipeline_data->charRegions[line_idx].size(); j++)
       {
         Rect expandedRegion = expandRect( pipeline_data->charRegions[line_idx][j], 2, 2, pipeline_data->thresholds[i].cols, pipeline_data->thresholds[i].rows) ;
 
-        tesseract.SetRectangle(expandedRegion.x, expandedRegion.y, expandedRegion.width, expandedRegion.height);
-        tesseract.Recognize(NULL);
+        tesseract->SetRectangle(expandedRegion.x, expandedRegion.y, expandedRegion.width, expandedRegion.height);
+        tesseract->Recognize(NULL);
 
-        tesseract::ResultIterator* ri = tesseract.GetIterator();
+        tesseract::ResultIterator* ri = tesseract->GetIterator();
         tesseract::PageIteratorLevel level = tesseract::RIL_SYMBOL;
         do
         {
@@ -158,11 +157,9 @@ namespace alpr
     
     return recognized_chars;
   }
-  void TesseractOcr::segment(PipelineData* pipeline_data) {
 
+  void TesseractOcr::segment(PipelineData* pipeline_data) {
     CharacterSegmenter segmenter(pipeline_data);
     segmenter.segment();
   }
-
-
 }
